@@ -9,3 +9,4 @@ dependencies:
   - scipy
   - pillow
   - pandas
+  - scikit-learn

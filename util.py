@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import ast
 import logging
+import matplotlib.pyplot as plt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -107,3 +108,66 @@ def prepare_for_regression(df, target_column='Minority Percent', include_genres=
     y = df[target_column]
     
     return X, y
+
+def parse_retention_curve(curve_data):
+    """
+    Parse SVG path retention curve data into x,y coordinates
+    Returns: tuple of (times, retention_values)
+    """
+    # Split the string into commands
+    parts = curve_data.strip().split(' ')
+    
+    times = []
+    retention_values = []
+    
+    i = 0
+    while i < len(parts):
+        if parts[i] in ['M', 'C']:
+            i += 1
+            continue
+            
+        if ',' in parts[i]:
+            time, retention = parts[i].split(',')
+            times.append(float(time))
+            retention_values.append(float(retention))
+        i += 1
+    
+    return np.array(times), np.array(retention_values)
+
+def visualize_retention_curve(curve_data, normalize=False, figsize=(12, 6)):
+    """
+    Visualize the retention/engagement curve using matplotlib.
+    
+    Args:
+        curve_data (str): SVG path data string
+        normalize (bool): If True, show normalized retention
+        figsize (tuple): Figure size (width, height)
+    """
+    # Parse the curve data
+    times, values = parse_retention_curve(curve_data)
+    
+    # Create the plot
+    plt.figure(figsize=figsize)
+    plt.plot(times, values, 'b-', linewidth=2)
+    
+    # Add labels and title
+    plt.xlabel('Time in Video')
+    plt.ylabel('Percentage')
+    title = 'Video Retention Curve' if normalize else 'Video Engagement Curve'
+    plt.title(title)
+    
+    # Add grid and set y-axis limits
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.ylim(0, max(values) * 1.05)  # Add 5% padding above max value
+    
+    # Add horizontal line at 100%
+    plt.axhline(y=100, color='r', linestyle='--', alpha=0.5)
+    
+    # Show the plot
+    plt.tight_layout()
+    plt.show()
+
+# Example usage:
+df = pd.read_csv('youtube.csv')
+print(df.loc[1, 'retentionCurve'])
+visualize_retention_curve(df.loc[0, 'retentionCurve'])

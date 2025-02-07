@@ -10,3 +10,5 @@ dependencies:
   - pillow
   - pandas
   - scikit-learn
+  - torch
+  - svgpath2mpl

@@ -88,9 +88,33 @@ def impute_combine_data(training1):
 
 def process_college_stats(college_stats):
     """Process college statistics"""
-    training2 = college_stats.sort_values('url').groupby(['url', 'stat']).first().reset_index()
-    training2 = training2.rename(columns={'url': 'key', 'stat': 'metric'}).drop('section', axis=1)
-    training2['metric'] = training2['metric'].str.replace('.', '_')
+    # Define the features we want to extract
+    target_stats = [
+        'games', 'seasons',
+        'completions', 'attempts', 'pass_yards', 'pass_ints', 'pass_tds',
+        'rec_yards', 'rec_td', 'receptions', 'rush_att', 'rush_yds', 'rush_td',
+        'solo_tackes', 'tackles', 'loss_tackles', 'ast_tackles',
+        'fum_forced', 'fum_rec', 'fum_tds', 'fum_yds',
+        'sacks', 'int', 'int_td', 'int_yards', 'pd',
+        'punt_returns', 'punt_return_td', 'punt_return_yards',
+        'kick_returns', 'kick_return_td', 'kick_return_yards'
+    ]
+    
+    # Filter for only the stats we want and aggregate by url
+    training2 = (college_stats[college_stats['stat'].isin(target_stats)]
+                 .sort_values('url')
+                 .groupby(['url', 'stat'])
+                 .first()
+                 .reset_index()
+                 .rename(columns={'url': 'key', 'stat': 'metric'}))
+    
+    # Ensure all target stats exist for each player (filling with 0 if missing)
+    training2 = (training2.pivot(index='key', columns='metric', values='value')
+                 .reindex(columns=target_stats)
+                 .fillna(0)
+                 .reset_index()
+                 .melt(id_vars=['key'], value_vars=target_stats))
+    
     return training2
 
 def create_final_dataset(combined, training1c, training2):
@@ -156,9 +180,6 @@ def prepare_data():
     
     # Save data
     save_processed_data(training, train_set, test_set, holdout_set)
-    
-    # Print summary
-    print_summary_statistics(training, train_set, test_set, holdout_set)
     
     return training, train_set, test_set, holdout_set
 

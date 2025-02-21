@@ -41,3 +41,9 @@ def convert_feather_to_csv():
         
     except Exception as e:
         print(f"Error converting feather to CSV: {e}")
+
+def main():
+    convert_feather_to_csv()
+
+if __name__ == "__main__":
+    main()

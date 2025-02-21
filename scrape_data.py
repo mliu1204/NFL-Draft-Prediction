@@ -181,52 +181,78 @@ def scrape_combine_data(years: List[int], scraper: SeleniumScraper) -> pd.DataFr
 def parse_pfr_tables(tables) -> pd.DataFrame:
     """
     Process and melt Pro Football Reference stat tables.
-    For each HTML table with an id found in HEADERS, it:
-      - Reads the table,
-      - Removes the first and last rows (as done in the R code),
-      - Renames the columns based on the HEADERS list,
-      - Drops columns: 'year', 'school', 'conf', 'class', 'pos',
-      - Adds a "seasons" column,
-      - Melts the table so that each stat becomes a row,
-      - Filters out empty values and converts the stat values to numeric.
+    Uses data-stat attributes from the Career row to extract stats.
     """
     results = []
+    games = None
+    seasons = None
+    
     for table in tables:
         table_id = table.get('id')
         if table_id in HEADERS:
             try:
-                df_list = pd.read_html(StringIO(str(table)))
-                if not df_list:
+                # Get the autostat list from the table attributes
+                autostat_list_str = table.get('data-autostat-list', '[]')
+                autostat_list = eval(autostat_list_str)
+                
+                # Find the Career row
+                career_row = table.find('tr', id=f'{table_id}.Career')
+                if not career_row:
                     continue
-                df = df_list[0]
                 
-                # Handle multi-level columns by taking the lowest level
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = df.columns.get_level_values(-1)
+                # Get games from first table only
+                if games is None:
+                    games_td = career_row.find('td', {'data-stat': 'games'})
+                    if games_td:
+                        games = float(games_td.text.strip())
                 
-                # Rename 'Season' to 'year' if it exists
-                df = df.rename(columns={'Season': 'year', 'Team': 'school', 'Conf': 'conf', 'Class': 'class', 'Pos': 'pos'})
-                # Keep only the last row (Career stats)
-                df = df.iloc[[-1]]
-                # if df.shape[1] == len(HEADERS[table_id]):
-                #     df.columns = HEADERS[table_id]
-                # else:
-                #     continue
+                # Get seasons from tbody length (only need to do this once)
+                if seasons is None:
+                    tbody = table.find('tbody')
+                    if tbody:
+                        seasons = len(tbody.find_all('tr'))
                 
-                # Drop non-numeric identifying columns
-                drop_cols = ['year', 'school', 'conf', 'class', 'pos', 'Awards']
-                df_melt = df.drop(columns=drop_cols, errors='ignore')
-                df_melt['seasons'] = 1
-                # Melt the dataframe to have one row per stat
-                melted = pd.melt(df_melt, id_vars=['seasons'], var_name='stat', value_name='value')
-                # Remove empty string values and convert stat values to numeric
-                melted = melted[melted['value'].astype(str) != '']
-                melted['value'] = pd.to_numeric(melted['value'], errors='coerce')
-                melted['section'] = table_id.replace('_standard', '')
-                results.append(melted)
+                # Get all td elements and their data-stat attributes
+                stats = {}
+                for td in career_row.find_all('td'):
+                    stat_name = td.get('data-stat')
+                    if stat_name and stat_name in autostat_list:
+                        value = td.text.strip()
+                        if value:
+                            try:
+                                stats[stat_name] = float(value)
+                            except ValueError:
+                                continue
+                
+                if stats:
+                    # Create DataFrame from stats dictionary
+                    df = pd.DataFrame([{
+                        'stat': stat,
+                        'value': value,
+                        'section': table_id.replace('_standard', '')
+                    } for stat, value in stats.items()])
+                    
+                    # Add games and seasons as rows
+                    if games is not None:
+                        df = pd.concat([df, pd.DataFrame([{
+                            'stat': 'games',
+                            'value': games,
+                            'section': table_id.replace('_standard', '')
+                        }])], ignore_index=True)
+                    
+                    if seasons is not None:
+                        df = pd.concat([df, pd.DataFrame([{
+                            'stat': 'seasons',
+                            'value': seasons,
+                            'section': table_id.replace('_standard', '')
+                        }])], ignore_index=True)
+                    
+                    results.append(df)
+                    
             except Exception as e:
                 print(f"Error processing table {table_id}: {e}")
                 continue
+                
     return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
 
 def main():

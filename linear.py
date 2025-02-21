@@ -1,47 +1,23 @@
-import os
 import pandas as pd
+from prepare_data import prepare_data
 
-def clean_html_filenames():
-    cache_dir = "cache"  # Adjust this path if your cache folder is elsewhere
-    
-    # Check if cache directory exists
-    if not os.path.exists(cache_dir):
-        print(f"Cache directory '{cache_dir}' not found")
-        return
-    
-    # Iterate through all files in the cache directory
-    for filename in os.listdir(cache_dir):
-        if ".html" in filename:
-            # Find the position of .html in the filename
-            html_pos = filename.find(".html")
-            # Create new filename by keeping everything up to and including .html
-            new_filename = filename[:html_pos + 5]  # +5 to include ".html"
-            
-            # Construct full file paths
-            old_path = os.path.join(cache_dir, filename)
-            new_path = os.path.join(cache_dir, new_filename)
-            
-            # Rename the file
-            if old_path != new_path:
-                try:
-                    os.rename(old_path, new_path)
-                    print(f"Renamed: {filename} -> {new_filename}")
-                except OSError as e:
-                    print(f"Error renaming {filename}: {e}")
-                    
-def convert_feather_to_csv():
-    try:
-        # Read feather file
-        df = pd.read_feather('data/college_stats.feather')
-        
-        # Write to CSV
-        output_path = 'college_stats.csv'
-        df.to_csv(output_path, index=False)
-        print(f"Successfully converted data/college_stats.feather to {output_path}")
-        
-    except Exception as e:
-        print(f"Error converting feather to CSV: {e}")
+def example():
+    # Returns data and masks. Example below is how to separate data with masks.
+    data, train_set, test_set, holdout_set = prepare_data()
+    train_data = data[train_set]
+    test_data = data[test_set]
+    holdout_data = data[holdout_set]
 
+    print(train_data.head())
+    print(test_data.head())
+    print(holdout_data.head())
+    
+    # The label is the pick. In the article that we are following, they make the label whether the player
+    # was picked in the first round or not.
+    # We can do this by using the pick column.
+    train_data['label'] = train_data['pick'].apply(lambda x: 1 if x <= 32 else 0)
+    test_data['label'] = test_data['pick'].apply(lambda x: 1 if x <= 32 else 0)
+    holdout_data['label'] = holdout_data['pick'].apply(lambda x: 1 if x <= 32 else 0)
 
 if __name__ == "__main__":
-    convert_feather_to_csv()
+    example()

@@ -41,9 +41,31 @@ def convert_feather_to_csv():
         
     except Exception as e:
         print(f"Error converting feather to CSV: {e}")
+        
+def analytics():
+    df = pd.read_feather('data/processed/training.feather')
+    
+    target_stats = [
+        'games', 'seasons',
+        'pass_cmp', 'pass_att', 'pass_yds', 'pass_int', 'pass_td',
+        'rec_yards', 'rec_td', 'receptions', 'rush_att', 'rush_yds', 'rush_td',
+        'tackles_solo', 'tackles_combined', 'tackles_loss', 'tackles_assists',
+        'fumbles_forced', 'fumbles_rec', 'fumbles_rec_tds', 'fumbles_rec_yds',
+        'sacks', 'def_int', 'def_int_td', 'def_int_yards', 'pass_defended',
+        'punt_ret', 'punt_ret_td', 'punt_ret_yds',
+        'kick_ret', 'kick_ret_td', 'kick_ret_yds'
+    ]
+    
+    # Count players with at least one non-zero stat
+    players_with_stats = (df[target_stats] != 0).any(axis=1).sum()
+    print(f"\nPlayers with at least one non-zero stat: {players_with_stats}")
+    
+    # Print total number of rows in dataset
+    total_rows = len(df)
+    print(f"\nTotal number of players: {total_rows}")
 
 def main():
-    convert_feather_to_csv()
+    analytics()
 
 if __name__ == "__main__":
     main()

@@ -19,6 +19,8 @@ def prepare_draft_data(draft_table):
     """Prepare draft table with key column"""
     left = draft_table[['year', 'round', 'pick', 'team', 'player', 'college', 
                         'pos', 'age', 'carav', 'drav', 'url']].copy()
+    # Clean URLs before creating key
+    left['url'] = left['url'].str.extract(r'(.*?\.html)')
     left['key'] = left.apply(lambda x: f"{x['player']}-{x['year']}" if pd.isna(x['url']) else x['url'], axis=1)
     return left
 
@@ -27,6 +29,8 @@ def prepare_combine_data(combine_table):
     right = combine_table[['year', 'player', 'pos', 'college', 'height', 'weight',
                           'forty', 'vertical', 'broad', 'bench', 'threecone',
                           'shuttle', 'url']].copy()
+    # Clean URLs before renaming
+    right['url'] = right['url'].str.extract(r'(.*?\.html)')
     right = right.rename(columns={
         'year': 'year_combine',
         'player': 'player_combine',
@@ -88,16 +92,19 @@ def impute_combine_data(training1):
 
 def process_college_stats(college_stats):
     """Process college statistics"""
+    # Clean URLs to only include up to .html
+    college_stats['url'] = college_stats['url'].str.extract(r'(.*?\.html)')
+    
     # Define the features we want to extract
     target_stats = [
         'games', 'seasons',
-        'completions', 'attempts', 'pass_yards', 'pass_ints', 'pass_tds',
+        'pass_cmp', 'pass_att', 'pass_yds', 'pass_int', 'pass_td',
         'rec_yards', 'rec_td', 'receptions', 'rush_att', 'rush_yds', 'rush_td',
-        'solo_tackes', 'tackles', 'loss_tackles', 'ast_tackles',
-        'fum_forced', 'fum_rec', 'fum_tds', 'fum_yds',
-        'sacks', 'int', 'int_td', 'int_yards', 'pd',
-        'punt_returns', 'punt_return_td', 'punt_return_yards',
-        'kick_returns', 'kick_return_td', 'kick_return_yards'
+        'tackles_solo', 'tackles_combined', 'tackles_loss', 'tackles_assists',
+        'fumbles_forced', 'fumbles_rec', 'fumbles_rec_tds', 'fumbles_rec_yds',
+        'sacks', 'def_int', 'def_int_td', 'def_int_yards', 'pass_defended',
+        'punt_ret', 'punt_ret_td', 'punt_ret_yds',
+        'kick_ret', 'kick_ret_td', 'kick_ret_yds'
     ]
     
     # Filter for only the stats we want and aggregate by url

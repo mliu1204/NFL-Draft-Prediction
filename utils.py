@@ -48,7 +48,7 @@ def analytics():
     target_stats = [
         'games', 'seasons',
         'pass_cmp', 'pass_att', 'pass_yds', 'pass_int', 'pass_td',
-        'rec_yards', 'rec_td', 'receptions', 'rush_att', 'rush_yds', 'rush_td',
+        'rec_yds', 'rec_td', 'rec', 'rush_att', 'rush_yds', 'rush_td',
         'tackles_solo', 'tackles_combined', 'tackles_loss', 'tackles_assists',
         'fumbles_forced', 'fumbles_rec', 'fumbles_rec_tds', 'fumbles_rec_yds',
         'sacks', 'def_int', 'def_int_td', 'def_int_yards', 'pass_defended',

@@ -32,24 +32,24 @@ Path('data').mkdir(exist_ok=True)
 
 # Define headers for college stats tables, mirroring those used in the R script
 HEADERS = {
-    'defense': ['year', 'school', 'conf', 'class', 'pos', 'games', 'solo.tackes', 'ast.tackles',
+    'defense_standard': ['year', 'school', 'conf', 'class', 'pos', 'games', 'solo.tackes', 'ast.tackles',
                 'tackles', 'loss.tackles', 'sacks', 'int', 'int.yards', 'int.yards.avg', 'int.td',
                 'pd', 'fum.rec', 'fum.yds', 'fum.tds', 'fum.forced'],
-    'scoring': ['year', 'school', 'conf', 'class', 'pos', 'games', 'td.rush', 'td.rec', 'td.int',
+    'scoring_standard': ['year', 'school', 'conf', 'class', 'pos', 'games', 'td.rush', 'td.rec', 'td.int',
                 'td.fr', 'td.pr', 'td.kr', 'td.oth', 'td.tot', 'kick.xpm', 'kick.fgm', 'twopm',
                 'safety', 'total.pts'],
-    'punt_ret': ['year', 'school', 'conf', 'class', 'pos', 'games',
+    'punt_return_standard': ['year', 'school', 'conf', 'class', 'pos', 'games',
                  'punt.returns', 'punt.return.yards', 'punt.return.avg', 'punt.return.td',
                  'kick.returns', 'kick.return.yards', 'kick.return.avg', 'kick.return.td'],
-    'receiving': ['year', 'school', 'conf', 'class', 'pos', 'games',
+    'receiving_standard': ['year', 'school', 'conf', 'class', 'pos', 'games',
                   'receptions', 'rec.yards', 'rec.avg', 'rec.td',
                   'rush.att', 'rush.yds', 'rush.avg', 'rush.td',
                   'scrim.plays', 'scrim.yds', 'scrim.avg', 'scrim.tds'],
-    'rushing': ['year', 'school', 'conf', 'class', 'pos', 'games',
+    'rushing_standard': ['year', 'school', 'conf', 'class', 'pos', 'games',
                 'receptions', 'rec.yards', 'rec.avg', 'rec.td',
                 'rush.att', 'rush.yds', 'rush.avg', 'rush.td',
                 'scrim.plays', 'scrim.yds', 'scrim.avg', 'scrim.tds'],
-    'passing': ['year', 'school', 'conf', 'class', 'pos', 'games',
+    'passing_standard': ['year', 'school', 'conf', 'class', 'pos', 'games',
                 'completions', 'attempts', 'comp.pct', 'pass.yards',
                 'yards.per.attempt', 'adj.yards.per.attempt', 'pass.tds',
                 'pass.ints', 'int.rate']
@@ -74,7 +74,7 @@ def requests_read_html_cache(url: str, cache_dir: str = 'cache', file_name: str 
         fn = file_name + '.htm'
     fn_path = os.path.join(cache_dir, fn)
     if not os.path.exists(fn_path):
-        time.sleep(random.randint(5, 8))
+        time.sleep(random.randint(5, 6))
         response = requests.get(url)
         response.raise_for_status()
         with open(fn_path, 'w', encoding='utf-8') as f:
@@ -91,9 +91,8 @@ def stats_requests_read_html_cache(url: str, cache_dir: str = 'cache', file_name
     if file_name is not None:
         fn = file_name + '.html'
     fn_path = os.path.join(cache_dir, fn)
-    print(fn_path, url)
     if not os.path.exists(fn_path):
-        time.sleep(random.randint(5, 8))
+        time.sleep(random.randint(5, 6))
         response = requests.get(url)
         response.raise_for_status()
         with open(fn_path, 'w', encoding='utf-8') as f:
@@ -162,7 +161,7 @@ def scrape_combine_data(years: List[int], scraper: SeleniumScraper) -> pd.DataFr
         soup = read_html_cache(url, scraper=scraper)
         table = soup.find('table', {'id': 'combine'})
         if table:
-            df_list = pd.read_html(str(table))
+            df_list = pd.read_html(StringIO(str(table)))
             if df_list:
                 df = df_list[0]
                 if df.shape[1] == len(COMBINE_HEADER):
@@ -196,21 +195,26 @@ def parse_pfr_tables(tables) -> pd.DataFrame:
         table_id = table.get('id')
         if table_id in HEADERS:
             try:
-                df_list = pd.read_html(str(table))
+                df_list = pd.read_html(StringIO(str(table)))
                 if not df_list:
                     continue
                 df = df_list[0]
-                # Remove first and last rows (like head(-1) and tail(-1) in R)
-                if df.shape[0] > 2:
-                    df = df.iloc[1:-1]
-                else:
-                    continue
-                if df.shape[1] == len(HEADERS[table_id]):
-                    df.columns = HEADERS[table_id]
-                else:
-                    continue
+                
+                # Handle multi-level columns by taking the lowest level
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(-1)
+                
+                # Rename 'Season' to 'year' if it exists
+                df = df.rename(columns={'Season': 'year', 'Team': 'school', 'Conf': 'conf', 'Class': 'class', 'Pos': 'pos'})
+                # Keep only the last row (Career stats)
+                df = df.iloc[[-1]]
+                # if df.shape[1] == len(HEADERS[table_id]):
+                #     df.columns = HEADERS[table_id]
+                # else:
+                #     continue
+                
                 # Drop non-numeric identifying columns
-                drop_cols = ['year', 'school', 'conf', 'class', 'pos']
+                drop_cols = ['year', 'school', 'conf', 'class', 'pos', 'Awards']
                 df_melt = df.drop(columns=drop_cols, errors='ignore')
                 df_melt['seasons'] = 1
                 # Melt the dataframe to have one row per stat
@@ -218,7 +222,7 @@ def parse_pfr_tables(tables) -> pd.DataFrame:
                 # Remove empty string values and convert stat values to numeric
                 melted = melted[melted['value'].astype(str) != '']
                 melted['value'] = pd.to_numeric(melted['value'], errors='coerce')
-                melted['section'] = table_id
+                melted['section'] = table_id.replace('_standard', '')
                 results.append(melted)
             except Exception as e:
                 print(f"Error processing table {table_id}: {e}")
@@ -267,11 +271,10 @@ def main():
         # # Step 4: Scrape College Stats from Each URL
         # # ---------------------------------
         college_stats_list = []
-        for url in urls:
+        for i, url in enumerate(urls):
             try:
                 soup = stats_requests_read_html_cache(url)
-                # soup = read_html_cache(url, scraper=scraper)
-                tables = soup.find_all('table', id=['defense_standard', 'passing_standard', 'rushing_standard', 'scoring_standard', 'kick_return_standard', 'kicking_standard', 'all_punt_return_standard'])
+                tables = soup.find_all('table', id=['defense_standard', 'passing_standard', 'rushing_standard', 'scoring_standard', 'kick_return_standard', 'kicking_standard', 'all_punt_return_standard', 'receiving_standard'])
                 stats = parse_pfr_tables(tables)
                 if not stats.empty:
                     # Group by 'section' and 'stat', summing the values just like the R code
@@ -282,6 +285,7 @@ def main():
                 print(f"Error processing URL {url}: {e}")
                 continue
 
+        
         college_stats_file = 'data/college_stats.feather'
         if college_stats_list:
             college_stats_df = pd.concat(college_stats_list, ignore_index=True)

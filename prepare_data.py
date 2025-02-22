@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+import os
 
 def coalesce(*args):
     """Combines multiple Series, taking first non-null value"""
@@ -99,7 +100,7 @@ def process_college_stats(college_stats):
     target_stats = [
         'games', 'seasons',
         'pass_cmp', 'pass_att', 'pass_yds', 'pass_int', 'pass_td',
-        'rec_yards', 'rec_td', 'receptions', 'rush_att', 'rush_yds', 'rush_td',
+        'rec_yds', 'rec_td', 'rec', 'rush_att', 'rush_yds', 'rush_td',
         'tackles_solo', 'tackles_combined', 'tackles_loss', 'tackles_assists',
         'fumbles_forced', 'fumbles_rec', 'fumbles_rec_tds', 'fumbles_rec_yds',
         'sacks', 'def_int', 'def_int_td', 'def_int_yards', 'pass_defended',
@@ -148,11 +149,27 @@ def create_data_splits(training, random_seed=42):
     return train_set, test_set, holdout_set
 
 def save_processed_data(training, train_set, test_set, holdout_set):
-    """Save processed data and splits"""
+    """Save processed data and splits, with separate files for each draft year"""
+    # Save the complete dataset
     training.to_feather('data/processed/training.feather')
+    
+    # Save the standard splits
     pd.Series(train_set).to_csv('data/processed/train_set.csv', index=False)
     pd.Series(test_set).to_csv('data/processed/test_set.csv', index=False)
     pd.Series(holdout_set).to_csv('data/processed/holdout_set.csv', index=False)
+    
+    # Save separate files for each draft year
+    for year in training['year'].unique():
+        year_mask = training['year'] == year
+        year_data = training[year_mask]
+        
+        # Create directory if it doesn't exist
+        year_dir = f'data/processed/by_year/{year}'
+        os.makedirs(year_dir, exist_ok=True)
+        
+        # Save year-specific data
+        year_data.to_feather(f'{year_dir}/training.feather')
+        year_data.to_csv(f'{year_dir}/training.csv', index=False)
 
 def print_summary_statistics(training, train_set, test_set, holdout_set):
     """Print summary statistics of the dataset"""
@@ -187,6 +204,10 @@ def prepare_data():
     
     # Save data
     save_processed_data(training, train_set, test_set, holdout_set)
+    
+    print("\nData saved successfully!")
+    print("Complete dataset saved to: data/processed/")
+    print("Year-specific datasets saved to: data/processed/by_year/")
     
     return training, train_set, test_set, holdout_set
 
